@@ -4,3 +4,4 @@ db.py
 *.png
 *.jpeg
 .env
+./venvCollab/
