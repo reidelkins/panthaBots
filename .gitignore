@@ -1,0 +1,6 @@
+*.json
+db.py
+*.jpg
+*.png
+*.jpeg
+.env
