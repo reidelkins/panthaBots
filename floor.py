@@ -1,5 +1,4 @@
 import discord
-from discord.ext import tasks
 from discord import option
 from dotenv import load_dotenv
 import os
@@ -8,6 +7,7 @@ from datetime import datetime, timedelta
 from subprocess import check_output, Popen, PIPE
 import http.client
 import json
+from discord.ext import tasks
 
 load_dotenv()
 TOKEN = os.getenv('FLOOR_TOKEN')
@@ -25,6 +25,9 @@ with open("./currBounties.json", "r") as f:
 with open("./collections.json", "r") as f:
         collections = json.load(f)
 
+with open("./floors.json", "r") as f:
+        floors = json.load(f)
+
 # def sweepTracker():
 #     start = datetime(2022, 9, 4).timestamp()
 #     with open("./activities.json", "r") as f:
@@ -38,6 +41,7 @@ with open("./collections.json", "r") as f:
 #             else:
 #                 sweepers[d["buyer"]] = 1
 #     print(sweepers)
+
 
 def getEmbedTemplate():
     embed=discord.Embed()
@@ -225,6 +229,7 @@ def getBountyInfo(server):
                     with open("./currBounties.json", "w") as f:
                         json.dump(currBounties, f)
 
+
 def getBountyAdmin(server):
     with open(f"./currBounties.json", "r") as f:
         data = json.load(f)
@@ -243,18 +248,21 @@ def getBounty(server, embed):
     for i in range(len(bounties)):
         nft = list(currBounties[server]['bounties'][i].keys())[0]
         if currBounties[server]['bounties'][i][nft]['status'] == "alive":
-            if currBounties[server]['bounties'][i][nft]['reward'] == "3E83XeuLtb4yVTTfTTYx99pjFZ3WvZRyGvN8sE2fzGeZ":
-                value = f"**Not Found Yet** | {currBounties[server]['bounties'][i][nft]['amount']} | AI Pantha WL\n\n"
+            if currBounties[server]['bounties'][i][nft]['display'] != "None":
+                value = f"**Not Found Yet** | {currBounties[server]['bounties'][i][nft]['amount']} | {currBounties[server]['bounties'][i][nft]['display']}\n\n"
             else:
                 value = f"**Not Found Yet** | {currBounties[server]['bounties'][i][nft]['amount']} | {currBounties[server]['bounties'][i][nft]['reward']}\n\n"
             embed.add_field(name=f"**{i+1}.**", value=value, inline=False)
         else:
-            value = f"**{currBounties[server]['bounties'][i][nft]['status']}** | {nft} | {currBounties[server]['bounties'][i][nft]['amount']} | {currBounties[server]['bounties'][i][nft]['reward']}\n"
+            if currBounties[server]['bounties'][i][nft]['display'] != "None":
+                value = f"**{currBounties[server]['bounties'][i][nft]['status']}** | {nft} \n {currBounties[server]['bounties'][i][nft]['amount']} {currBounties[server]['bounties'][i][nft]['display']}\n"
+            else:
+                value = f"**{currBounties[server]['bounties'][i][nft]['status']}** | {nft} | {currBounties[server]['bounties'][i][nft]['amount']} | {currBounties[server]['bounties'][i][nft]['reward']}\n"
             value += f"Winner  🎉 - {currBounties[server]['bounties'][i][nft]['buyer']}\n\n"
             embed.add_field(name=f"**{i+1}.**", value=value, inline=False)
     return embed
 
-@bot.slash_command(name="create_dao_wallet")
+@bot.slash_command(name="create_dao_wallet", guild_ids=["972266110911119451"])
 async def create_dao_wallet(ctx):
     embed=getEmbedTemplate()
     server = str(ctx.guild).replace(" ", "_")
@@ -269,7 +277,7 @@ async def create_dao_wallet(ctx):
     await ctx.respond(embed=embed, ephemeral=True)
 
 
-@bot.slash_command(name="add_collection_name")
+@bot.slash_command(name="add_collection_name", guild_ids=["972266110911119451"])
 async def add_collection_name(ctx, collection_name: str):
     server = str(ctx.guild).replace(" ", "_")
     embed=getEmbedTemplate()
@@ -284,13 +292,14 @@ async def add_collection_name(ctx, collection_name: str):
     await ctx.respond(embed=embed, ephemeral=True)
 
 
-@bot.slash_command(name="create_bounty_contest")
+@bot.slash_command(name="create_bounty_contest", guild_ids=["972266110911119451"])
 @option(
     "attachment",
     discord.Attachment,
     description="A screenshot of the listed NFTs from ME",
     required=True  # The default value will be None if the user doesn't provide a file.
 )
+# @bot.slash_command(name="create_bounty_contest")
 async def create_bounty_contest(ctx, screenshot: discord.Attachment, weeks: int=0, days: int=0,):
     server = str(ctx.guild).replace(" ", "_")
     file = await screenshot.to_file()
@@ -322,8 +331,8 @@ async def create_bounty_contest(ctx, screenshot: discord.Attachment, weeks: int=
     await ctx.respond(embed=embed, ephemeral=True)
 
 
-@bot.slash_command(name="add_bounty")
-async def add_bounty(ctx, nft: str, amount: float, reward: str="SOL"):
+@bot.slash_command(name="add_bounty", guild_ids=["972266110911119451"])
+async def add_bounty(ctx, nft: str, amount: float, rewardtoken: str="SOL", rewarddisplay: str="None"):
     server = str(ctx.guild).replace(" ", "_")
     embed=getEmbedTemplate()
     if server not in currBounties:
@@ -332,7 +341,7 @@ async def add_bounty(ctx, nft: str, amount: float, reward: str="SOL"):
     else:
         await ctx.defer()
         foundNFT = checkIfNFTExists(nft, server)
-        foundEnoughToken = checkTokenBalance(server, amount, reward)
+        foundEnoughToken = checkTokenBalance(server, amount, rewardtoken)
         if foundNFT == "ERROR":
             embed.add_field(name="Error", value=f"There was an issue retrieving listing results. Please try the command again", inline=False)
         elif foundEnoughToken == "ERROR":
@@ -340,21 +349,21 @@ async def add_bounty(ctx, nft: str, amount: float, reward: str="SOL"):
         elif not foundNFT:
             embed.add_field(name="Error", value=f"Did not find that {nft} listed on MagicEden.", inline=False)
         elif not foundEnoughToken:
-            embed.add_field(name="Error", value=f"Either did not find the {reward} token in your DAO wallet or there is not enough of that along with the rest of the current bounties.", inline=False)
+            embed.add_field(name="Error", value=f"Either did not find the {rewardtoken} token in your DAO wallet or there is not enough of that along with the rest of the current bounties.", inline=False)
         else:
             for i in range(len(currBounties[server]['bounties'])):
                 if nft in currBounties[server]['bounties'][i].keys():
                     embed.add_field(name="error", value=f"There is already a bounty for {nft}.")
                     await ctx.followup.send(embed=embed, ephemeral=True)
                     return
-            currBounties[server]['bounties'].append({nft: {"reward":reward, "amount":amount, "status":"alive"}})
+            currBounties[server]['bounties'].append({nft: {"reward":rewardtoken, "amount":amount, "status":"alive", "display":rewarddisplay}})
             with open("./currBounties.json", "w") as f:
                 json.dump(currBounties, f)
-            embed.add_field(name="Success", value=f"Bounty added on {nft}. The reward will be {amount} {reward}.", inline=False)
+            embed.add_field(name="Success", value=f"Bounty added on {nft}. The reward will be {amount} {rewardtoken}.", inline=False)
     await ctx.followup.send(embed=embed, ephemeral=True)
 
 
-@bot.slash_command(name="remove_bounty")
+@bot.slash_command(name="remove_bounty", guild_ids=["972266110911119451"])
 async def remove_bounty(ctx, nft: str):
     server = str(ctx.guild).replace(" ", "_")
     notFound = True
@@ -378,7 +387,7 @@ async def remove_bounty(ctx, nft: str):
 
 
 #TODO
-@bot.slash_command(name="check_bounty_admin")
+@bot.slash_command(name="check_bounty_admin", guild_ids=["972266110911119451"])
 async def check_bounty_admin(ctx):
     server = str(ctx.guild).replace(" ", "_")
     embed=getEmbedTemplate()
@@ -387,7 +396,7 @@ async def check_bounty_admin(ctx):
         await ctx.respond(embed=embed, ephemeral=True)
     else:
         file = discord.File(f"./{server}_bountySS.jpg")
-        if datetime.now() - timedelta(minutes=10) > datetime.fromtimestamp(currBounties[server]['lastChecked']):
+        if datetime.now() + timedelta(hours=5) - timedelta(minutes=10) > datetime.fromtimestamp(currBounties[server]['lastChecked']):
             await ctx.defer()
             getBountyInfo(server)
             value = getBountyAdmin(server)
@@ -399,7 +408,7 @@ async def check_bounty_admin(ctx):
             await ctx.respond(embed=embed, ephemeral=True, file=file)
     
 
-@bot.slash_command(name="check_bounty")
+@bot.slash_command(name="check_bounty", guild_ids=["972266110911119451"])
 async def check_bounty(ctx):
     server = str(ctx.guild).replace(" ", "_")
     embed=getEmbedTemplate()
@@ -408,7 +417,7 @@ async def check_bounty(ctx):
         await ctx.respond(embed=embed)
     else:
         file = discord.File(f"./{server}_bountySS.jpg")
-        if datetime.now() - timedelta(minutes=10) > datetime.fromtimestamp(currBounties[server]['lastChecked']):
+        if datetime.now() + timedelta(hours=5) - timedelta(minutes=10) > datetime.fromtimestamp(currBounties[server]['lastChecked']):
             await ctx.defer()
             getBountyInfo(server)
             embed.add_field(name=f"Bounty Contest - Ends at {str(datetime.fromtimestamp(currBounties[server]['end']))[:16]} UCT", value="Good Luck!", inline=False)
@@ -421,9 +430,12 @@ async def check_bounty(ctx):
 
 
 
-@bot.slash_command(name="send_rewards")
+@bot.slash_command(name="send_rewards", guild_ids=["972266110911119451"])
 async def send_rewards(ctx):
     server = str(ctx.guild).replace(" ", "_")
+    print(server)
+    for bounty in currBounties:
+        print(bounty)
     embed=getEmbedTemplate()
     if server in currBounties:
         for i in range(len(currBounties[server]['bounties'])):
@@ -441,7 +453,7 @@ async def send_rewards(ctx):
         embed.add_field(name="Error", value=f"You do not have an active bounty contest to send rewards for!", inline=False)
     await ctx.respond(embed=embed, ephemeral=True)
 
-@bot.slash_command(name="end_bounty")
+@bot.slash_command(name="end_bounty", guild_ids=["972266110911119451"])
 async def end_bounty(ctx):
     server = str(ctx.guild).replace(" ", "_")
     embed=getEmbedTemplate()
@@ -463,18 +475,83 @@ async def end_bounty(ctx):
     await ctx.respond(embed=embed, ephemeral=True)
     pass
 
-# @bot.slash_command(name="test_embed")
-# async def test_embed(ctx):
-#     embed=getEmbedTemplate()
-#     embed.add_field(name="*Italics*", value="Surround your text in asterisks (\*)", inline=False)
-#     embed.add_field(name="**Bold**", value="Surround your text in double asterisks (\*\*)", inline=False)
-#     embed.add_field(name="__Underline__", value="1. Surround your text in double underscores (\_\_)\n2. This is some other data", inline=False)
-#     embed.add_field(name="~~Strikethrough~~", value="Surround your text in double tildes (\~\~)", inline=False)
-#     embed.add_field(name="`Code Chunks`", value="Surround your text in backticks (\`)", inline=False)
-#     embed.add_field(name="Blockquotes", value="> Start your text with a greater than symbol (\>)", inline=False)
-#     embed.add_field(name="Secrets", value="||Surround your text with double pipes (\|\|)||", inline=False)
-#     await ctx.respond(embed=embed, ephemeral=True)
 
 #TODO check that currBounty is still active everywhere
 
+@bot.slash_command(name="start_loop", guild_ids=["972266110911119451"])
+async def start_loop(ctx):
+    print("start")
+    f.start()
+
+@bot.slash_command(name="stop_loop", guild_ids=["972266110911119451"])
+async def stop_loop(ctx):
+    print("stop")
+    f.stop()
+
+@tasks.loop(minutes=30)
+async def f():
+    print("looping")
+    for guild in bot.guilds:
+        if guild.name == "Hello Pantha":
+            channel = bot.get_channel(1020066086001061999)
+            server = str(guild.name).replace(" ", "_")
+            embed=getEmbedTemplate()
+            if server not in currBounties:
+                embed.add_field(name="Error", value=f"There is not a current bounty countest, please contact an admin to start one!", inline=False)
+                await channel.send(embed=embed)
+            else:
+                file = discord.File(f"./{server}_bountySS.jpg")
+                if datetime.now() + timedelta(hours=5) - timedelta(minutes=10) > datetime.fromtimestamp(currBounties[server]['lastChecked']):
+                    getBountyInfo(server)
+                    embed.add_field(name=f"Bounty Contest - Ends at {str(datetime.fromtimestamp(currBounties[server]['end']))[:16]} UCT", value="Good Luck!", inline=False)
+                    embed = getBounty(server, embed)
+                    await channel.send(embed=embed, file=file)
+                else:
+                    embed.add_field(name=f"Bounty Contest - Ends at {str(datetime.fromtimestamp(currBounties[server]['end']))[:16]} UCT", value="Good Luck!", inline=False)
+                    embed = getBounty(server, embed)
+                    await channel.send(embed=embed, file=file) #channel id here
+
+
+@bot.slash_command(name="start_find_floor", guild_ids=["972266110911119451"])
+async def start_find_floor(ctx):
+    server = str(ctx.guild).replace(" ", "_")
+    findFloor.start(server)
+
+@bot.slash_command(name="stop_find_floor", guild_ids=["972266110911119451"])
+async def stop_find_floor(ctx):
+    findFloor.stop("")
+
+@tasks.loop(minutes=10)
+async def findFloor(server):
+    # server = "Hello_Pantha"
+    # getListings(server)
+    floorPrice = 1000
+    with open(f'./{server}_listings.json', 'r') as f:
+        listings = json.load(f)
+    for listing in listings:
+        if listing['price'] < floorPrice:
+            floorPrice = listing['price']
+            floors[server] = {'price': listing['price'], 'address':[listing['tokenAddress']]}
+        elif listing['price'] == floorPrice:
+            floors[server]['address'].append(listing['tokenAddress'])
+    with open(f'./floors.json', 'w') as f:
+        json.dump(floors, f)
+
+@bot.slash_command(name="show_floor", guild_ids=["972266110911119451"])
+async def show_floor(ctx):
+    server = str(ctx.guild).replace(" ", "_")
+    embed=getEmbedTemplate()
+    if server in floors:
+        embed.add_field(name=f"Price", value=f"{floors[server]['price']}", inline=False)
+        if len(floors[server]['address']) == 1:
+            embed.add_field(name=f"NFT", value=f"{floors[server]['address'][0]}", inline=False)
+        else:
+            nfts = ""
+            for i in range(len(floors[server]['address'])):
+                nfts +=  floors[server]['address'][i] + "\n"
+            embed.add_field(name=f"NFTs", value=f"{nfts}", inline=False)
+        embed.add_field(name=f"Reward", value=f"Between 50 and 500 $POP", inline=False)
+    else:
+        embed.add_field(name="Error:", value="Cannot find the floor at this time. Please try again later", inline=False)
+    await ctx.respond(embed=embed)
 bot.run(TOKEN)
