@@ -42,8 +42,11 @@ def getServer(guild):
         return "Infected_Mob"
     elif guild == "🔥🔥🔥test test test_🔥🔥🔥":
         return "test_test_test_"
-    if guild == "to 🧪Infected Mob🧪":
+    elif guild == "to 🧪Infected Mob🧪":
         return "reids_test_worked"
+    elif guild == "Focus5sports.com":
+        print("focus5sports")
+        return "Focus5sports"
     else:
         return str(guild).replace(" ", "_")
 
@@ -289,7 +292,7 @@ async def create_dao_wallet(ctx):
 @bot.slash_command(name="add_collection_name")
 async def add_collection_name(ctx, collection_name: str):
     server = getServer(ctx.guild)
-    print(datetime.now() + " -- " + server + " -- add_collection_name")
+    print((datetime.now().strftime("%m%d%Y, %H:%M")) + " -- " + server + " -- add_collection_name")
     embed=getEmbedTemplate()
     if str(ctx.guild.id) in os.getenv('ALL'):
         request = getOneActivity(collection_name)
@@ -350,6 +353,7 @@ async def create_bounty_contest(ctx, screenshot: discord.Attachment, weeks: int=
 
 @bot.slash_command(name="add_bounty")
 async def add_bounty(ctx, nft: str, amount: float, rewardtoken: str="SOL", rewarddisplay: str="None"):
+    print("HELLO")
     server = getServer(ctx.guild)
     print((datetime.now().strftime("%m%d%Y, %H:%M")) + " -- " + server + " -- add_bounty")
     embed=getEmbedTemplate()
